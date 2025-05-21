@@ -3,11 +3,13 @@ package com.security_jwt.config;
 import com.security_jwt.model.Role;
 import com.security_jwt.model.User;
 import com.security_jwt.repository.UserRepository;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -70,7 +72,7 @@ public class JWTUtils {
     }
 
     //token validation
-    public boolean isTokenValid(String token){
+    public boolean isTokenValid(String token, UserDetails userDetails){
         try{
             Jwts.parserBuilder().setSigningKey(secret).build().parseClaimsJwt(token);
             return true;
@@ -79,5 +81,13 @@ public class JWTUtils {
         }
     }
 
+    public String extractUserName(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(secret)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
 
+        return claims.getSubject();
+    }
 }

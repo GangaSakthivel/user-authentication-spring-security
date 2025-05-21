@@ -8,18 +8,4 @@ import org.springframework.stereotype.Service;
 @Service
 public class AuthenticationService {
 
-    private final UserRepository userRepository;
-
-    public AuthenticationService(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
-
-    private User dtoToEntity(UserRequestDTO userRequestDTO){
-
-        User user = new User();
-        user.setUserName(userRequestDTO.getUserName());
-        user.set
-
-    }
-
 }
