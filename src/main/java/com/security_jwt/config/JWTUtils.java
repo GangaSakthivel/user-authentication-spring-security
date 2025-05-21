@@ -7,80 +7,49 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.Date;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-
 @Component
 public class JWTUtils {
 
     private final UserRepository userRepository;
+    private final String secret;
+    private final Long jwtExpiration;
 
-    private String secret;
-
-    private Long jwtExpiration;
-
-    //@Value should not come from lombok
-
-
-    @Autowired
-    public JWTUtils(UserRepository userRepository, @Value("${auth.jwt.secret}") String secret,
-                    @Value("${auth.jwt.expiration}") Long jwtExpiration) {
-        super();
+    public JWTUtils(UserRepository userRepository,
+                    @Value("${jwt.secret}") String secret,
+                    @Value("${jwt.expiration}") Long jwtExpiration) {
         this.userRepository = userRepository;
-        this.secret = Base64.getUrlEncoder()
-                .withoutPadding()
-                .encodeToString(secret.getBytes(StandardCharsets.UTF_8));
+        this.secret = secret; // Avoid unnecessary Base64 encoding
         this.jwtExpiration = jwtExpiration;
     }
 
-    //token generation
+    // Generate JWT token with roles
     public String generateToken(String phoneNumber) {
         Optional<User> user = userRepository.findByPhoneNumber(phoneNumber);
-        Set<Role> roles = user.get().getRoles();
+        Set<Role> roles = user.orElseThrow(() -> new RuntimeException("User not found")).getRoles();
 
-        //add roles to the token
+        String rolesString = roles.stream()
+                .map(role -> role.getRoleName().name())
+                .collect(Collectors.joining(","));
 
-        return Jwts.builder().setSubject(phoneNumber).claim("roles", roles.stream()
-                        .map(role -> role.getRoleName().name())
-                        .collect(Collectors.joining(",")))
-                .setIssuedAt(new Date()).setExpiration(new Date(new Date().getTime() + jwtExpiration))
+        return Jwts.builder()
+                .setSubject(phoneNumber)
+                .claim("roles", rolesString)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration))
                 .signWith(SignatureAlgorithm.HS256, secret)
                 .compact();
-
     }
 
-    //extract user name
-    public String extractToken(String token) {
-        return Jwts.parserBuilder().setSigningKey(secret).build().parseClaimsJwt(token).getBody().getSubject();
-    }
-
-    //extract roles
-    public Set<String> extractRoles(String token) {
-        String rolesString = Jwts.parserBuilder().setSigningKey(secret)
-                .build().parseClaimsJwt(token).getBody().get("roles", String.class);
-        return Set.of(rolesString);
-    }
-
-    //token validation
-    public boolean isTokenValid(String token, UserDetails userDetails){
-        try{
-            Jwts.parserBuilder().setSigningKey(secret).build().parseClaimsJwt(token);
-            return true;
-        }catch (JwtException | IllegalArgumentException e){
-            return false;
-        }
-    }
-
+    // Extract phone number (username) from token
     public String extractUserName(String token) {
         Claims claims = Jwts.parserBuilder()
                 .setSigningKey(secret)
@@ -89,5 +58,27 @@ public class JWTUtils {
                 .getBody();
 
         return claims.getSubject();
+    }
+
+    // Extract roles from token
+    public Set<String> extractRoles(String token) {
+        String rolesString = Jwts.parserBuilder()
+                .setSigningKey(secret)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .get("roles", String.class);
+
+        return Set.of(rolesString.split(","));
+    }
+
+    // Validate token and ensure it matches the user
+    public boolean isTokenValid(String token, UserDetails userDetails) {
+        try {
+            String phoneNumber = extractUserName(token);
+            return phoneNumber.equals(userDetails.getUsername());
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
     }
 }

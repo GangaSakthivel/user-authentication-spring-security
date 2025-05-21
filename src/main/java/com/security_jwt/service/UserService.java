@@ -63,8 +63,14 @@ public class UserService {
         // Convert role strings to Role entities
         Set<Role> roles = dto.getRoles().stream()
                 .map(roleStr -> {
-                    RoleName roleName = RoleName.valueOf(roleStr);
-                    return roleRepository.findByRoleName(String.valueOf(roleName))
+                    RoleName roleName;
+                    try {
+                        roleName = RoleName.valueOf(roleStr.toUpperCase()); // convert string to enum
+                    } catch (IllegalArgumentException e) {
+                        throw new RuntimeException("Invalid role: " + roleStr);
+                    }
+
+                    return roleRepository.findByRoleName((roleName))
                             .orElseThrow(() -> new RuntimeException("Role not found: " + roleStr));
                 })
                 .collect(Collectors.toSet());
@@ -74,19 +80,12 @@ public class UserService {
         return user;
     }
 
-
     public User registerUser(UserRequestDTO requestDTO) {
         if (userRepository.findByPhoneNumber(requestDTO.getPhoneNumber()).isPresent()) {
             throw new RuntimeException("User with phone number " + requestDTO.getPhoneNumber() + " already exists");
         }
-        //request to entity
+
         User user = convertToEntity(requestDTO);
-        //save user in db
-        User savedUser = userRepository.save(user);
-        return savedUser;
-
-
-
-
+        return userRepository.save(user);
     }
 }

@@ -52,11 +52,12 @@ public class AuthController {
         }
 
         try {
-            User user = userService.registerUser(requestDTO);
-            userRepository.save(user);
-
-            return ResponseEntity.ok(new BaseResponseDTO<>(1, ResponseMessages.USER_CREATED, "User registered successfully."));
+            User user = userService.registerUser(requestDTO); // this should handle saving the user
+            return ResponseEntity.ok(
+                    new BaseResponseDTO<>(1, ResponseMessages.USER_CREATED, user.getPhoneNumber())
+            );
         } catch (Exception e) {
+            e.printStackTrace(); // log this
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new BaseResponseDTO<>(0, ResponseMessages.ERROR, null));
@@ -64,6 +65,7 @@ public class AuthController {
     }
 
 
+    @PostMapping("/login")
     public String loginUser(LoginRequestDTO requestDTO) {
         try {
             // Create authentication token using phoneNumber and password
